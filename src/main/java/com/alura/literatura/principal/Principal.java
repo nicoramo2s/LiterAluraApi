@@ -36,6 +36,8 @@ public class Principal {
                     1 - Buscar libro por titulo
                     2 - Listar libros registrados
                     3 - Listar autores registrados
+                    4 - Listar autores vivos en un determinado año
+                    5 - Listar libros por idioma
 
                     0 - Salir
                     """;
@@ -51,6 +53,12 @@ public class Principal {
                     break;
                 case 3:
                     listarAutoresRegistrados();
+                    break;
+                case 4:
+                    listarAutoresVivosPorFecha();
+                    break;
+                case 5:
+                    listarLibrosPorIdioma();
                     break;
                 case 0:
                     System.out.println("Cerrando la aplicación...");
@@ -80,38 +88,87 @@ public class Principal {
         Optional<DatosLibros> datos = consultarDatosLibro();
         if (datos.isPresent()) {
             Libros libro = new Libros(datos);
+            Libros tituloLibro = librosRepository.findByTitulo(libro.getTitulo());
+            if (tituloLibro != null && tituloLibro.getTitulo().equals(libro.getTitulo())) {
+                System.out.println("-------------------\nEl Libro ya esta registrado y no puedes volverlo a registrar");
+            } else {
+                List<Autores> autoresList = datos.get().autores().stream()
+                        .map(a -> {
+                            // Buscar autor existente o crear uno nuevo
+                            Optional<Autores> autorExistente = autoresRepository
+                                    .findByNombreAndFechaNacimientoAndFechaFallecimiento(
+                                            a.nombre(), a.fechaNacimiento(), a.fechaFallecimiento());
+                            if (autorExistente.isPresent()) {
+                                return autorExistente.get();
+                            } else {
+                                Autores nuevoAutor = new Autores(a.nombre(), a.fechaNacimiento(),
+                                        a.fechaFallecimiento());
+                                return autoresRepository.save(nuevoAutor);
+                            }
+                        })
+                        .collect(Collectors.toList());
 
-            List<Autores> autoresList = datos.get().autores().stream()
-                    .map(a -> {
-                        // Buscar autor existente o crear uno nuevo
-                        Optional<Autores> autorExistente = autoresRepository
-                                .findByNombreAndFechaNacimientoAndFechaFallecimiento(
-                                        a.nombre(), a.fechaNacimiento(), a.fechaFallecimiento());
-                        if (autorExistente.isPresent()) {
-                            return autorExistente.get();
-                        } else {
-                            Autores nuevoAutor = new Autores(a.nombre(), a.fechaNacimiento(), a.fechaFallecimiento());
-                            return autoresRepository.save(nuevoAutor);
-                        }
-                    })
-                    .collect(Collectors.toList());
+                // Asociar los autores al libro
+                libro.setAutores(autoresList);
+                System.out.println(libro.toString());
+                // Guardar el libro
+                librosRepository.save(libro);
 
-            // Asociar los autores al libro
-            libro.setAutores(autoresList);
-            System.out.println(libro.toString());
-            // Guardar el libro
-            librosRepository.save(libro);
+            }
         } else {
-            System.out.println("No se encontraron datos para el libro especificado.");
+            System.out.println("----------------\nNo se encontraron datos para el libro especificado.");
         }
     }
 
     public void listarLibrosRegistrados() {
         List<Libros> libros = librosRepository.findAll();
-        System.out.println(libros);
+        if (!libros.isEmpty()) {
+            System.out.println(libros);
+        } else {
+            System.out.println("-------------\nNo hay Libros registrado");
+        }
     }
+
     public void listarAutoresRegistrados() {
         List<Autores> autores = autoresRepository.findAll();
-        System.out.println(autores);
+        if (!autores.isEmpty()) {
+            System.out.println(autores);
+        } else {
+            System.out.println("-------------\nNo hay autores registrados");
+        }
+    }
+
+    public void listarAutoresVivosPorFecha() {
+        System.out.println("Ingrese el año vivo del autor que desee buscar");
+        int fecha = input.nextInt();
+        List<Autores> autores = autoresRepository.buscarAutoresPorDeterminadoAño(fecha);
+        if (!autores.isEmpty()) {
+            System.out.println(autores.toString());
+        } else {
+            System.out.println("------------------\nNo hay autores registrados en ese año");
+        }
+    }
+
+    public void listarLibrosPorIdioma() {
+        System.out.println("""
+
+                Ingrese el idioma del libro que desea buscar
+                es - Español
+                en - Ingles
+                jp - Japones
+                fr - Frances
+                pt - Portugues
+
+                """);
+        String idioma = input.nextLine();
+
+        List<Libros> libros = librosRepository.buscarLibrosPorIdioma(idioma);
+
+        if (!libros.isEmpty()) {
+            System.out.println(libros.toString());
+        } else {
+            System.out.println("---------------------------------\nNo tenemos libros registrados en ese idioma");
+        }
+
     }
 }
